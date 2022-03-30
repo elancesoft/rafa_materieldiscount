@@ -642,8 +642,9 @@ class DSMoebelScrapper
             //echo 'Error:' . curl_error($ch);
         }
 
-        // echo("Results");
-        // echo($result);
+
+        //echo("Results");
+        ////echo($result);
 
         if (!isset($result) || empty($result)) {
             return false;
@@ -663,11 +664,14 @@ class DSMoebelScrapper
                 //updating script status
                 DSUtility::update_script_status();
 
+                $sku_prefix = $this->generate_random_string(3); // Added by TuanPV[elancefoxvn]
+
                 $product_id = 0;
                 $temp_products = get_posts([
                     'post_type' => 'product',
                     'meta_key' => '_sku',
-                    'meta_value' => $productdata->_source->sku
+                    'meta_value' => $productdata->_source->sku,
+                    'meta_compare' => 'LIKE' // added by TuanPV [elancefoxvn] for sku_prefix task
                 ]);
 
                 if (!empty($productdata->_source->url_path)) {
@@ -712,7 +716,8 @@ class DSMoebelScrapper
                                 'post_type' => 'product',
                                 'post_status' => 'publish', // This could also be $data['status'];
                                 'meta_input' => array(
-                                    '_sku' => $productdata->_source->sku,
+                                    // '_sku' => $productdata->_source->sku,
+                                    '_sku' => $sku_prefix . '_' . $productdata->_source->sku,
                                     'source_url' => $productdata->_source->url_path,
                                     'source_id' => $productdata->_source->id,
                                     'source_website' => 'www.ggmmoebel.com',
@@ -821,12 +826,15 @@ class DSMoebelScrapper
         if (empty($source_url)) {
             return;
         }
-
+        //echo("SCRAP PRODUCCT");
         $page_url = "https://www.ggmmoebel.com/fr-fr-eur/{$source_url}";
-        // echo $page_url;
-
+        //echo("Page URL : " . $page_url);
+        //echo("product permalink : " . get_permalink($product_id));
         $ch = curl_init();
         curl_setopt($ch, CURLOPT_URL, $page_url);
+        //setting proxy
+        //        SelRevScrapper::get_instance()->set_proxy($ch);
+
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
         curl_setopt($ch, CURLOPT_ENCODING, 'gzip, deflate');
 
@@ -839,88 +847,98 @@ class DSMoebelScrapper
 
         $curlinfo = curl_getinfo($ch);
         $result = curl_exec($ch);
+        //echo("RESULT : ");
+        ////echo($result);
         if (curl_errno($ch)) {
             error_log("ERROR : ");
             error_log(curl_error($ch));
             return false;
+            //echo 'Error:' . curl_error($ch);
+            //            $this->scrap_status = curl_error($ch);
         }
         curl_close($ch);
-        
-        // echo("RESULT : ");
-        // echo($result);die;
 
         $first_string = ",\"product\":";
         $second_string = ",\"ggm-reset-password\"";
         $json = DSUtility::getStringBetween($result, $first_string, $second_string);
 
         if (!isset($json) || empty($json)) {
-            echo 'go here?';die;
             return false;
         }
         $jsondata = json_decode($json);
-
-        // echo("JSON DATA");
-        // print_r($jsondata);die;
+        //echo("ADD JSON DATA");
+        //echo(print_r($jsondata,true));
 
         $first_string = "<body>";
         $second_string = "<script>window.";
         $result = DSUtility::getStringBetween($result, $first_string, $second_string);
 
-        // ADDED BY TUANPV [elancefoxvn]
+
+        // Added code by TuanPV [elancefoxvn]
         $url_api_ggmmoebel = "http://51.210.3.40:3000/api/ggmmoebel/{$source_url}";
-        $ch = curl_init();
-        curl_setopt($ch, CURLOPT_URL, $url_api_ggmmoebel);
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
+        $ch_api = curl_init();
+        curl_setopt($ch_api, CURLOPT_URL, $url_api_ggmmoebel);
+        curl_setopt($ch_api, CURLOPT_RETURNTRANSFER, 1);
 
-        $result_api = curl_exec($ch);
-
-        if (curl_errno($ch)) {
-            error_log("ERROR : ");
-            error_log(curl_error($ch));
-            return false;
-        }
-        curl_close($ch);
-
+        $result_api = curl_exec($ch_api);
         $resultAPIObj = json_decode($result_api);
         $result_api_html = $resultAPIObj->html;
-
-        // echo $result_api_html;die;
 
         $first_string = "<body>";
         $second_string = "<footer";
         $result_api_html = DSUtility::getStringBetween($result_api_html, $first_string, $second_string);
         $result_api_html .= "</div></div></div></div>";
 
-        // echo '$result_api_html' . $result_api_html;die;
-        $html = str_get_html($result_api_html);
-        // END ADDED BY TUANPV [elancefoxvn]
-        
-        // $html = str_get_html($result); // commented by TuanPV [elancefoxvn]
-        // echo 'HTML';echo($html);die;
+        $html_api = str_get_html($result_api_html);
+        // END Added code by TuanPV [elancefoxvn]
 
-        $regular_price = 0;
+        $html = str_get_html($result);
 
+        // Commented by TuanPV: update regular price => old code
+        /*$regular_price = 0;
         if (!empty($html->find(".price-wrapper .price-original", 0))) {
             $regular_price = $html->find(".price-wrapper .price-original", 0)->plaintext;
             $regular_price = trim($regular_price);
             $regular_price = str_replace("*", "", $regular_price);
             $regular_price = str_replace("EUR", "", $regular_price);
             $regular_price = str_replace(",", ".", $regular_price);
+        }*/
+
+        $regular_price = 0;
+        if (!empty($html_api->find(".price-wrapper .price-original", 0))) {
+            $regular_price = $html_api->find(".price-wrapper .price-original", 0)->plaintext;
+            $regular_price = trim($regular_price);
+            $regular_price = str_replace("*", "", $regular_price);
+            $regular_price = str_replace("EUR", "", $regular_price);
+            $regular_price = str_replace(",", ".", $regular_price);
         }
+
+        echo '$regular_price' . $regular_price;
+
+        // Commented by TuanPV: update delivery time => old code
+        /*$delivery_time = "";
+        if (!empty($html->find(".delivery-time-stock", 0)->plaintext)) {
+            $delivery_time = $html->find(".delivery-time-stock", 0)->plaintext;
+        }
+        if (isset($delivery_time) && !empty($delivery_time)) {
+            $delivery_time = trim($delivery_time);
+        }
+        update_post_meta($product_id, "delivery_time", $delivery_time);*/
+
+        // Added code by TuanPV
         $delivery_time = "";
-
-        // if (!empty($html->find(".delivery-time-stock", 0)->plaintext)) { // Commented by TuanPV [elancefoxvn]
-        if (!empty($html->find(".delivery-time .stock", 0)->plaintext)) {
-            $delivery_time = $html->find(".delivery-time .stock", 0)->plaintext;
+        if (!empty($html_api->find(".delivery-time .stock", 0)->plaintext)) {
+            $delivery_time = $html_api->find(".delivery-time .stock", 0)->plaintext;
         }
-
         if (isset($delivery_time) && !empty($delivery_time)) {
             $delivery_time = trim($delivery_time);
         }
         update_post_meta($product_id, "delivery_time", $delivery_time);
+        // END Added code by TuanPV
 
         //scrapping variable product data
-        $has_variables = $this->scrap_variable_product_data($product_id, $html, $regular_price);
+        // $has_variables = $this->scrap_variable_product_data($product_id, $html, $regular_price); // Commented by TuanPV => old code
+        $has_variables = $this->scrap_variable_product_data($product_id, $html_api, $regular_price);
 
         $description = "";
         try {
@@ -952,6 +970,9 @@ class DSMoebelScrapper
         $short_description = $jsondata->current->short_description;
         $short_description .= "<div class='delivery_time'>{$delivery_time}</div>";
 
+
+        // echo '$regular_price-after=' . $regular_price;//tuanpv
+
         $product = wc_get_product($product_id);
         $product->set_regular_price($regular_price);
         //        if($has_variables){
@@ -961,14 +982,14 @@ class DSMoebelScrapper
         $product->set_description($description);
         $product->save();
         wp_update_post(["ID" => $product_id]);
+
+        // die('done'.$product_id);//tuanpv
     }
 
     public function scrap_variable_product_data($product_id, $html, $regular_price)
     {
         $variables = array();
         $qty_arr = array();
-
-        echo $product_id;
         foreach ($html->find(".tier-prices-wrapper .-body .tier-price") as $element) {
             $qty = 0;
             $incl_tax = 0;
@@ -1006,9 +1027,6 @@ class DSMoebelScrapper
 
             //            error_log("From {$qty} - {$regular_price} - {$excl_tax} - {$discount}");
         }
-
-        echo '$variables';
-        print_r($variables);die;
 
         if (!empty($variables)) {
             update_post_meta($product_id, "pbq_discount_table_data", $variables);
@@ -1120,5 +1138,25 @@ class DSMoebelScrapper
         $logs = implode(";", $logs) . PHP_EOL;
 
         fwrite(self::$image_logs_file, $logs);
+    }
+
+    /**
+     * Generate random string for SKU
+     * @author TuanPV [https://freelancer.com/u/elancefoxvn]
+     * @param number $length
+     * @return string $random_string
+     */
+    public function generate_random_string($length = 3)
+    {
+        $characters = '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ';
+        $charactersLength = strlen($characters);
+
+        $randomString = '';
+
+        for ($i = 0; $i < $length; $i++) {
+            $randomString .= $characters[rand(0, $charactersLength - 1)];
+        }
+
+        return strtoupper(substr(md5(time()), 0, $length));
     }
 }

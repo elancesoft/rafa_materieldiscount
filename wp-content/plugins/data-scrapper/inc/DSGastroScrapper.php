@@ -700,7 +700,7 @@ class DSGastroScrapper
                             'post_type' => 'product',
                             'post_status' => 'publish', // This could also be $data['status'];
                             'meta_input' => array(
-                                // '_sku' => $productdata->_source->sku,
+                                // '_sku' => $productdata->_source->sku,`
                                 '_sku' => $sku_prefix . '_' . $productdata->_source->sku,
                                 'source_url' => $productdata->_source->url_path,
                                 'source_id' => $productdata->_source->id,
@@ -883,8 +883,6 @@ class DSGastroScrapper
             }
             update_post_meta($product_id, "delivery_time", $delivery_time);
         }
-
-
         // End Added code by TuanPV
 
         // Commented by TuanPV: old code to get delivery time
