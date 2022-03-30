@@ -892,7 +892,7 @@ class DSMoebelScrapper
         $html_api = str_get_html($result_api_html);
         // END Added code by TuanPV [elancefoxvn]
 
-        $html = str_get_html($result);
+        // $html = str_get_html($result); // Commented by TuanPV => because from here, the system will use $html_api
 
         // Commented by TuanPV: update regular price => old code
         /*$regular_price = 0;
@@ -912,8 +912,6 @@ class DSMoebelScrapper
             $regular_price = str_replace("EUR", "", $regular_price);
             $regular_price = str_replace(",", ".", $regular_price);
         }
-
-        echo '$regular_price' . $regular_price;
 
         // Commented by TuanPV: update delivery time => old code
         /*$delivery_time = "";
@@ -970,9 +968,6 @@ class DSMoebelScrapper
         $short_description = $jsondata->current->short_description;
         $short_description .= "<div class='delivery_time'>{$delivery_time}</div>";
 
-
-        // echo '$regular_price-after=' . $regular_price;//tuanpv
-
         $product = wc_get_product($product_id);
         $product->set_regular_price($regular_price);
         //        if($has_variables){
@@ -982,8 +977,6 @@ class DSMoebelScrapper
         $product->set_description($description);
         $product->save();
         wp_update_post(["ID" => $product_id]);
-
-        // die('done'.$product_id);//tuanpv
     }
 
     public function scrap_variable_product_data($product_id, $html, $regular_price)
